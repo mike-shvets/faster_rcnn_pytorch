@@ -18,7 +18,7 @@ from .kitti_tracking import kitti_tracking
 from .nthu import nthu
 from .coco import coco
 from .kittivoc import kittivoc
-
+from .SpaceNet import spacenet
 
 def _selective_search_IJCV_top_k(split, year, top_k):
     """Return an imdb that uses the top k proposals from the selective search
@@ -29,6 +29,11 @@ def _selective_search_IJCV_top_k(split, year, top_k):
     imdb.config['top_k'] = top_k
     return imdb
 
+# Set up SpaceNet
+for split in ['train', 'test']:
+    name = 'spacenet_{}'.format(split)
+    __sets[name] = (lambda split=split: 
+                    spacenet(split))
 
 # Set up voc_<year>_<split> using selective search "fast" mode
 for year in ['2007', '2012', '0712']:

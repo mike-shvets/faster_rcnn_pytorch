@@ -10,6 +10,7 @@
 import numpy as np
 
 import PIL
+import cv2
 
 # TODO: make fast_rcnn irrelevant
 # >>>> obsolete, because it depends on sth outside of this project
@@ -25,8 +26,11 @@ def prepare_roidb(imdb):
     each ground-truth box. The class with maximum overlap is also
     recorded.
     """
-    sizes = [PIL.Image.open(imdb.image_path_at(i)).size
+    #sizes = [PIL.Image.open(imdb.image_path_at(i)).size
+    #         for i in xrange(imdb.num_images)]
+    sizes = [cv2.imread(imdb.image_path_at(i), cv2.IMREAD_GRAYSCALE).T.shape
              for i in xrange(imdb.num_images)]
+             
     roidb = imdb.roidb
     for i in xrange(len(imdb.image_index)):
         roidb[i]['image'] = imdb.image_path_at(i)

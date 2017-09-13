@@ -138,6 +138,8 @@ def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
 
     return labels, overlaps, rois, bbox_targets, bbox_inside_weights
 
+from ..datasets.SpaceNet_utils.io_images.io import get_normalized_3band
+
 def _get_image_blob(roidb, scale_inds):
     """Builds an input blob from the images in the roidb at the specified
     scales.
@@ -146,7 +148,9 @@ def _get_image_blob(roidb, scale_inds):
     processed_ims = []
     im_scales = []
     for i in xrange(num_images):
-        im = cv2.imread(roidb[i]['image'])
+        #im = cv2.imread(roidb[i]['image'])
+        im = get_normalized_3band(roidb[i]['image'])
+
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]
         target_size = cfg.TRAIN.SCALES[scale_inds[i]]
@@ -154,7 +158,8 @@ def _get_image_blob(roidb, scale_inds):
                                         cfg.TRAIN.MAX_SIZE)
         im_scales.append(im_scale)
         processed_ims.append(im)
-
+        
+        
     # Create a blob to hold the input images
     blob = im_list_to_blob(processed_ims)
 

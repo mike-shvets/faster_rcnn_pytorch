@@ -33,12 +33,19 @@ def log_print(text, color=None, on_color=None, attrs=None):
 
 # hyper-parameters
 # ------------
-imdb_name = 'voc_2007_trainval'
+#imdb_name = 'voc_2007_trainval'
+imdb_name = 'spacenet_train'
 cfg_file = 'experiments/cfgs/faster_rcnn_end2end.yml'
-pretrained_model = 'data/pretrained_model/VGG_imagenet.npy'
-output_dir = 'models/saved_model3'
 
-start_step = 0
+# pretrained_model = 'data/pretrained_model/VGG_imagenet.npy'
+
+output_dir = 'models/saved_SpaceNet'
+#output_dir = 'models/saved_tmp'
+
+# set non-zero to start from snapshot
+#start_step = 0
+start_step = 35000
+
 end_step = 100000
 lr_decay_steps = {60000, 80000}
 lr_decay = 1./10
@@ -46,7 +53,11 @@ lr_decay = 1./10
 rand_seed = 1024
 _DEBUG = True
 use_tensorboard = True
-remove_all_log = False   # remove all historical experiments in TensorBoard
+#use_tensorboard = False
+
+remove_all_log = False   # keep all historical experiments in TensorBoard
+# remove_all_log = True   # remove all historical experiments in TensorBoard
+
 exp_name = None # the previous experiment name in TensorBoard
 
 # ------------
@@ -70,8 +81,13 @@ data_layer = RoIDataLayer(roidb, imdb.num_classes)
 
 # load net
 net = FasterRCNN(classes=imdb.classes, debug=_DEBUG)
-network.weights_normal_init(net, dev=0.01)
-network.load_pretrained_npy(net, pretrained_model)
+if start_step == 0:
+    network.weights_normal_init(net, dev=0.01)
+    network.load_pretrained_npy(net, pretrained_model)
+else:
+    load_name = os.path.join(output_dir, 'faster_rcnn_{}.h5'.format(start_step))
+    network.load_net(load_name, net)
+
 # model_file = '/media/longc/Data/models/VGGnet_fast_rcnn_iter_70000.h5'
 # model_file = 'models/saved_model3/faster_rcnn_60000.h5'
 # network.load_net(model_file, net)
@@ -84,8 +100,12 @@ net.cuda()
 net.train()
 
 params = list(net.parameters())
-# optimizer = torch.optim.Adam(params[-8:], lr=lr)
-optimizer = torch.optim.SGD(params[8:], lr=lr, momentum=momentum, weight_decay=weight_decay)
+if cfg.TRAIN.SOLVER == 'Adam':
+    print 'Adam solver chosen'
+    optimizer = torch.optim.Adam(params[8:], lr=lr) #, weight_decay=weight_decay)
+else:
+    print 'SGD solver chosen'
+    optimizer = torch.optim.SGD(params[8:], lr=lr, momentum=momentum, weight_decay=weight_decay)
 
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
@@ -110,7 +130,6 @@ re_cnt = False
 t = Timer()
 t.tic()
 for step in range(start_step, end_step+1):
-
     # get one batch
     blobs = data_layer.forward()
     im_data = blobs['data']
@@ -166,13 +185,16 @@ for step in range(start_step, end_step+1):
                       'rcnn_box': float(net.loss_box.data.cpu().numpy()[0])}
             exp.add_scalar_dict(losses, step=step)
 
-    if (step % 10000 == 0) and step > 0:
+    if (step % 2500 == 0) and step > 0:
         save_name = os.path.join(output_dir, 'faster_rcnn_{}.h5'.format(step))
         network.save_net(save_name, net)
         print('save model: {}'.format(save_name))
     if step in lr_decay_steps:
         lr *= lr_decay
-        optimizer = torch.optim.SGD(params[8:], lr=lr, momentum=momentum, weight_decay=weight_decay)
+        if cfg.TRAIN.SOLVER == 'Adam':
+            optimizer = torch.optim.Adam(params[8:], lr=lr)  # , weight_decay=weight_decay)
+        else:
+            optimizer = torch.optim.SGD(params[8:], lr=lr, momentum=momentum, weight_decay=weight_decay)
 
     if re_cnt:
         tp, tf, fg, bg = 0., 0., 0, 0

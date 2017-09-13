@@ -13,17 +13,20 @@ from faster_rcnn.fast_rcnn.bbox_transform import bbox_transform_inv, clip_boxes
 from faster_rcnn.datasets.factory import get_imdb
 from faster_rcnn.fast_rcnn.config import cfg, cfg_from_file, get_output_dir
 
+from faster_rcnn.datasets.SpaceNet_utils.io_images import io
 
 # hyper-parameters
 # ------------
-imdb_name = 'voc_2007_test'
+#imdb_name = 'voc_2007_test'
+imdb_name = 'spacenet_test'
 cfg_file = 'experiments/cfgs/faster_rcnn_end2end.yml'
 # trained_model = '/media/longc/Data/models/VGGnet_fast_rcnn_iter_70000.h5'
-trained_model = 'models/saved_model3/faster_rcnn_90000.h5'
+#trained_model = 'models/saved_model3/faster_rcnn_100000.h5'
+trained_model = 'models/saved_SpaceNet/faster_rcnn_35000.h5'
 
 rand_seed = 1024
 
-save_name = 'faster_rcnn_100000'
+save_name = 'faster_rcnn_35000'
 max_per_image = 300
 thresh = 0.05
 vis = False
@@ -98,7 +101,8 @@ def test_net(name, net, imdb, max_per_image=300, thresh=0.05, vis=False):
 
     for i in range(num_images):
 
-        im = cv2.imread(imdb.image_path_at(i))
+        # im = cv2.imread(imdb.image_path_at(i))
+        im = io.get_normalized_3band(imdb.image_path_at(i))
         _t['im_detect'].tic()
         scores, boxes = im_detect(net, im)
         detect_time = _t['im_detect'].toc(average=False)
