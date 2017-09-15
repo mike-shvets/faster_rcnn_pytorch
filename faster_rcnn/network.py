@@ -41,6 +41,15 @@ def save_net(fname, net):
         h5f.create_dataset(k, data=v.cpu().numpy())
 
 
+def load_net_first_layers(fname, net, k=-2):
+    import h5py
+    h5f = h5py.File(fname, mode='r')
+
+    items = net.state_dict().items()[:k]
+    for k, v in items:
+        param = torch.from_numpy(np.asarray(h5f[k]))
+        v.copy_(param)
+
 def load_net(fname, net):
     import h5py
     h5f = h5py.File(fname, mode='r')

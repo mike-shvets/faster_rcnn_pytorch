@@ -38,13 +38,14 @@ imdb_name = 'spacenet_train'
 cfg_file = 'experiments/cfgs/faster_rcnn_end2end.yml'
 
 # pretrained_model = 'data/pretrained_model/VGG_imagenet.npy'
+pretrained_model = 'models/VGGnet_fast_rcnn_iter_70000.h5'
 
 output_dir = 'models/saved_SpaceNet'
 #output_dir = 'models/saved_tmp'
 
 # set non-zero to start from snapshot
-#start_step = 0
-start_step = 35000
+start_step = 0
+# start_step = 37500
 
 end_step = 100000
 lr_decay_steps = {60000, 80000}
@@ -82,11 +83,16 @@ data_layer = RoIDataLayer(roidb, imdb.num_classes)
 # load net
 net = FasterRCNN(classes=imdb.classes, debug=_DEBUG)
 if start_step == 0:
+    # print [name + '\n' for name, param in net.state_dict().iteritems()]
+
     network.weights_normal_init(net, dev=0.01)
-    network.load_pretrained_npy(net, pretrained_model)
+    # network.load_pretrained_npy(net, pretrained_model)
+    network.load_net_first_layers(pretrained_model, net, k=-4)
+    print "Loaded pretrained model {}".format(pretrained_model)
 else:
     load_name = os.path.join(output_dir, 'faster_rcnn_{}.h5'.format(start_step))
     network.load_net(load_name, net)
+    print "Starting from step {:d}: {}".format(start_step, pretrained_model)
 
 # model_file = '/media/longc/Data/models/VGGnet_fast_rcnn_iter_70000.h5'
 # model_file = 'models/saved_model3/faster_rcnn_60000.h5'
@@ -185,7 +191,7 @@ for step in range(start_step, end_step+1):
                       'rcnn_box': float(net.loss_box.data.cpu().numpy()[0])}
             exp.add_scalar_dict(losses, step=step)
 
-    if (step % 2500 == 0) and step > 0:
+    if (step % 10000 == 0) and step > 0:
         save_name = os.path.join(output_dir, 'faster_rcnn_{}.h5'.format(step))
         network.save_net(save_name, net)
         print('save model: {}'.format(save_name))
