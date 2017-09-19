@@ -18,7 +18,34 @@ from ..fast_rcnn.config import cfg
 # <<<< obsolete
 from ..utils.blob import prep_im_for_blob, im_list_to_blob
 
-def get_minibatch(roidb, num_classes):
+def rotate_coords(coords, M):
+    """Rotate coords with rotation matrix M
+    INPUT:
+       coords -- array Nx2
+       M -- matrix 2x3
+    """
+    homogen_coords = np.hstack((coords, np.ones((len(coords), 1))))
+    return np.dot(homogen_coords, M.T)
+
+def get_boxes_from_polygons(polygons, h, w):
+    """Get simple inclusive boxes
+    INPUT:
+       polygons -- list of arrays Nx2
+       h, w -- height and width of the image
+    """
+    num_objs = len(polygons)
+    boxes = np.zeros((num_objs, 4), dtype=np.uint16)
+    # Load object bounding boxes into a data frame.
+    for ix, polygon in enumerate(polygons):
+        x1 = max(0, polygon[:, 0].min())
+        y1 = max(0, polygon[:, 1].min())
+        x2 = min(w - 1, polygon[:, 0].max())
+        y2 = min(h - 1, polygon[:, 1].max())
+        boxes[ix, :] = [x1, y1, x2, y2]
+
+    return boxes
+
+def get_minibatch(roidb, num_classes, random_rotation=False):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
@@ -30,20 +57,51 @@ def get_minibatch(roidb, num_classes):
     rois_per_image = cfg.TRAIN.BATCH_SIZE / num_images
     fg_rois_per_image = np.round(cfg.TRAIN.FG_FRACTION * rois_per_image)
 
-    # Get the input image blob, formatted for caffe
-    im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
+
+    # generate random rotation angles
+    if random_rotation:
+        rotation_matrices = np.zeros((num_images, 2, 3), dtype='float32')
+        for i in xrange(num_images):
+            angle = np.random.randint(0, 36) * 10
+            # print 'Angle:', angle
+
+            cx, cy = roidb[i]['width'] // 2, roidb[i]['height'] // 2
+            rotation_matrices[i] = cv2.getRotationMatrix2D((cx, cy), angle, 1)
+
+            # Get the input image blob, formatted for caffe
+            im_blob, im_scales = _get_image_blob(roidb, random_scale_inds, rotation_matrices)
+    else: ## no rotation
+        im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
 
     blobs = {'data': im_blob}
 
     if cfg.TRAIN.HAS_RPN:
         assert len(im_scales) == 1, "Single batch only"
         assert len(roidb) == 1, "Single batch only"
+
+        if random_rotation:
+            if 'polygons' in roidb[0]:
+                polygons = roidb[0]['polygons']
+                # print polygons
+                # print
+                polygons = [rotate_coords(polygons[i], rotation_matrices[0])
+                            for i in xrange(len(polygons))]
+                # print polygons
+                roidb_boxes = get_boxes_from_polygons(polygons, roidb[0]['height'], roidb[0]['width'])
+            else:
+                # TODO: insert box rotation here
+                raise Exception('polygons required')
+        else:
+            roidb_boxes = roidb[0]['boxes']
+
         # gt boxes: (x1, y1, x2, y2, cls)
         gt_inds = np.where(roidb[0]['gt_classes'] != 0)[0]
         gt_boxes = np.empty((len(gt_inds), 5), dtype=np.float32)
-        gt_boxes[:, 0:4] = roidb[0]['boxes'][gt_inds, :] * im_scales[0]
+        gt_boxes[:, 0:4] = roidb_boxes[gt_inds, :] * im_scales[0]
         gt_boxes[:, 4] = roidb[0]['gt_classes'][gt_inds]
         blobs['gt_boxes'] = gt_boxes
+
+
         blobs['gt_ishard'] = roidb[0]['gt_ishard'][gt_inds]  \
             if 'gt_ishard' in roidb[0] else np.zeros(gt_inds.size, dtype=int)
         # blobs['gt_ishard'] = roidb[0]['gt_ishard'][gt_inds]
@@ -140,7 +198,7 @@ def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
 
 from ..datasets.SpaceNet_utils.io_images.io import get_normalized_3band
 
-def _get_image_blob(roidb, scale_inds):
+def _get_image_blob(roidb, scale_inds, rotation_matrices=None):
     """Builds an input blob from the images in the roidb at the specified
     scales.
     """
@@ -150,6 +208,10 @@ def _get_image_blob(roidb, scale_inds):
     for i in xrange(num_images):
         #im = cv2.imread(roidb[i]['image'])
         im = get_normalized_3band(roidb[i]['image'])
+        if rotation_matrices is not None:
+            M = rotation_matrices[i]
+            h, w = im.shape[:2]
+            im = cv2.warpAffine(im, M, (w, h))
 
         if roidb[i]['flipped']:
             im = im[:, ::-1, :]

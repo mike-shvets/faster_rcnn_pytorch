@@ -17,6 +17,7 @@ import glob
 import uuid
 import scipy.io as sio
 import xml.etree.ElementTree as ET
+import cPickle as pickle
 
 from .imdb import imdb
 from .imdb import ROOT_DIR
@@ -181,15 +182,48 @@ class spacenet(imdb):
 
         return self.create_roidb_from_box_list(box_list, gt_roidb)
 
+
+    def get_boxes_from_polygons(self, polygons):
+        """Get simple inclusive boxes
+        INPUT:
+           polygons -- list of arrays Nx2
+        """
+        num_objs = len(polygons)
+        boxes = np.zeros((num_objs, 4), dtype=np.uint16)
+        # Load object bounding boxes into a data frame.
+        for ix, polygon in enumerate(polygons):
+            x1 = polygon[:, 0].min()
+            y1 = polygon[:, 1].min()
+            x2 = polygon[:, 0].max()
+            y2 = polygon[:, 1].max()
+            boxes[ix, :] = [x1, y1, x2, y2]
+
+        return boxes
+
     def _load_pascal_annotation(self, index):
         """
         Load image and bounding boxes info from XML file in the PASCAL VOC
         format.
         """
 
-        filename = os.path.join(self._data_path, 'annotations', index + '.npy')
+        # read predefined boxes
+        # filename = os.path.join(self._data_path, 'annotations', index + '.npy')
+        # boxes = np.load(filename)
 
-        boxes = np.load(filename)
+        # read initial polygon coordinates
+        filename = os.path.join(self._data_path, 'polygons_pickle', index + '.pkl')
+        polygons_all = pickle.load(open(filename, 'rb'))
+        boxes_all = self.get_boxes_from_polygons(polygons_all)
+
+        ## eliminate small objects
+        polygons, boxes = [], []
+        for i, box in enumerate(boxes_all):
+            if (box[2] - box[0]) * (box[3] - box[1]) > 99:
+                polygons.append(polygons_all[i])
+                boxes.append(box)
+        boxes = np.array(boxes)
+
+
         num_objs = len(boxes)
         # all buildings -- single class
         gt_classes = np.ones((num_objs), dtype=np.int32)
@@ -204,6 +238,7 @@ class spacenet(imdb):
         overlaps = scipy.sparse.csr_matrix(overlaps)
 
         return {'boxes': boxes,
+                'polygons': polygons,
                 'gt_classes': gt_classes,
                 'gt_ishard': ishards,
                 'gt_overlaps': overlaps,

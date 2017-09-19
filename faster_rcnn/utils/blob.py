@@ -40,3 +40,16 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size):
                     interpolation=cv2.INTER_LINEAR)
 
     return im, im_scale
+
+def inv_prep_visual(im):
+    """Inverse image preparation function for visualization purposes
+    Warning: this is not a "real" inverse
+    add mean values and cast to uint8
+    """
+
+    minval, maxval = np.percentile(im, (0, 100), axis=(0, 1))
+    im = (im - minval[..., :]) / (maxval[..., :] - minval[..., :])
+    im *= 255
+    im = im.astype('uint8')
+
+    return im

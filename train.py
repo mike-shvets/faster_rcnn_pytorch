@@ -38,17 +38,18 @@ imdb_name = 'spacenet_train'
 cfg_file = 'experiments/cfgs/faster_rcnn_end2end.yml'
 
 # pretrained_model = 'data/pretrained_model/VGG_imagenet.npy'
-pretrained_model = 'models/VGGnet_fast_rcnn_iter_70000.h5'
+# pretrained_model = 'models/VGGnet_fast_rcnn_iter_70000.h5'
+pretrained_model = 'models/saved_SpaceNet/faster_rcnn_100000.h5'
 
-output_dir = 'models/saved_SpaceNet'
+output_dir = 'models/saved_Space_augRotations'
 #output_dir = 'models/saved_tmp'
 
 # set non-zero to start from snapshot
 start_step = 0
 # start_step = 37500
 
-end_step = 100000
-lr_decay_steps = {60000, 80000}
+end_step = 300000
+lr_decay_steps = {100000, 250000}
 lr_decay = 1./10
 
 rand_seed = 1024
